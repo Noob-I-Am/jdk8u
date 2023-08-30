@@ -368,7 +368,7 @@ public abstract class AbstractQueuedLongSynchronizer
                 node.prev = t;
                 if (compareAndSetTail(t, node)) {
                     t.next = node;
-                    return t;
+                    return t; //返回node在阻塞队列中的前继节点
                 }
             }
         }
@@ -1459,8 +1459,13 @@ public abstract class AbstractQueuedLongSynchronizer
          * case the waitStatus can be transiently and harmlessly wrong).
          */
         Node p = enq(node);
-        int ws = p.waitStatus;
+        int ws = p.waitStatus;//node前继节点的状态
+        /**
+         * ws > 0 成立表示前继节点为取消状态
+         * compareAndSetWaitStatus 返回false表示修改前继节点为signal失败（其他线程在响应中断信号时将前置节点改为取消状态）
+         */
         if (ws > 0 || !compareAndSetWaitStatus(p, ws, Node.SIGNAL))
+            //唤醒当前线程
             LockSupport.unpark(node.thread);
         return true;
     }
@@ -1650,10 +1655,11 @@ public abstract class AbstractQueuedLongSynchronizer
         private void doSignal(Node first) {
             do {
                 if ( (firstWaiter = first.nextWaiter) == null)
+                    //若当前节点的nextWaiter为空，则当前节点移出锁队列之后，整个队列为空
                     lastWaiter = null;
                 first.nextWaiter = null;
-            } while (!transferForSignal(first) &&
-                     (first = firstWaiter) != null);
+            } while (!transferForSignal(first) &&  //transferForSignal返回true表示当前节点转移到阻塞队列成功
+                     (first = firstWaiter) != null);//当前节点转移至阻塞队列失败，则找下一个条件队列中的节点进行转移，直至条件队列为空（确保必须有一个被唤醒）
         }
 
         /**
@@ -1715,8 +1721,10 @@ public abstract class AbstractQueuedLongSynchronizer
          *         returns {@code false}
          */
         public final void signal() {
+            //检查是否当前线程独占，否则抛出异常
             if (!isHeldExclusively())
                 throw new IllegalMonitorStateException();
+            //获取条件队列第一个Node
             Node first = firstWaiter;
             if (first != null)
                 doSignal(first);

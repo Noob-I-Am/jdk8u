@@ -178,9 +178,11 @@ public class CountDownLatch {
             for (;;) {
                 int c = getState();
                 if (c == 0)
+                    //c==0表明前面已有其他线程将计数减为0
                     return false;
                 int nextc = c-1;
                 if (compareAndSetState(c, nextc))
+                    //nextc == 0表明当前调用countDown方法的线程就是触发唤醒操作的线程
                     return nextc == 0;
             }
         }
