@@ -160,10 +160,12 @@ public class ThreadLocal<T> {
      */
     public T get() {
         Thread t = Thread.currentThread();
+        //获取当前线程的threadLocals 引用
         ThreadLocalMap map = getMap(t);
         if (map != null) {
             ThreadLocalMap.Entry e = map.getEntry(this);
             if (e != null) {
+                //返回线程局部变量threadLocals中取出的value
                 @SuppressWarnings("unchecked")
                 T result = (T)e.value;
                 return result;
@@ -339,27 +341,33 @@ public class ThreadLocal<T> {
         /**
          * The initial capacity -- MUST be a power of two.
          */
+        //初始化map内部散列表的长度
         private static final int INITIAL_CAPACITY = 16;
 
         /**
          * The table, resized as necessary.
          * table.length MUST always be a power of two.
          */
+        //当前ma内部散列表数组的引用，保持为2的次方
         private Entry[] table;
 
         /**
          * The number of entries in the table.
          */
+        //散列表占用情况，存放entry的数量
         private int size = 0;
 
         /**
          * The next size value at which to resize.
          */
+        //扩容触发阈值，触发后调用rehash()方法
+                //rehash()方法先检查全局过期数据，把散列表中所有国企的entry移除，如果移除之后当前散列表中的entry仍然达到threshold - threshold/4 就进行扩容
         private int threshold; // Default to 0
 
         /**
          * Set the resize threshold to maintain at worst a 2/3 load factor.
          */
+        //设置阈值为数组长度的2/3
         private void setThreshold(int len) {
             threshold = len * 2 / 3;
         }
@@ -367,6 +375,7 @@ public class ThreadLocal<T> {
         /**
          * Increment i modulo len.
          */
+        //获取下一个数组下标index位置，可以循环访问
         private static int nextIndex(int i, int len) {
             return ((i + 1 < len) ? i + 1 : 0);
         }
@@ -374,6 +383,7 @@ public class ThreadLocal<T> {
         /**
          * Decrement i modulo len.
          */
+        //获取上一个数组下标index位置，可以循环访问
         private static int prevIndex(int i, int len) {
             return ((i - 1 >= 0) ? i - 1 : len - 1);
         }
@@ -384,6 +394,7 @@ public class ThreadLocal<T> {
          * one when we have at least one entry to put in it.
          */
         ThreadLocalMap(ThreadLocal<?> firstKey, Object firstValue) {
+            //初始化散列表
             table = new Entry[INITIAL_CAPACITY];
             int i = firstKey.threadLocalHashCode & (INITIAL_CAPACITY - 1);
             table[i] = new Entry(firstKey, firstValue);
@@ -432,11 +443,13 @@ public class ThreadLocal<T> {
          * @return the entry associated with key, or null if no such
          */
         private Entry getEntry(ThreadLocal<?> key) {
+            //获取路由
             int i = key.threadLocalHashCode & (table.length - 1);
             Entry e = table[i];
             if (e != null && e.get() == key)
                 return e;
             else
+                //可能路由计算出来的位置的key不是当前ThreadLocal,散列表有冲突
                 return getEntryAfterMiss(key, i, e);
         }
 
@@ -451,18 +464,24 @@ public class ThreadLocal<T> {
          */
         private Entry getEntryAfterMiss(ThreadLocal<?> key, int i, Entry e) {
             Entry[] tab = table;
+            //获取散列表table长度
             int len = tab.length;
 
+            //往后进行有限范围的数据查找，当slot == null的情况，搜索结束
             while (e != null) {
                 ThreadLocal<?> k = e.get();
                 if (k == key)
+                    //向后查询找到和所需key相同的entry
                     return e;
+                //当前slop中的entry#key关联的ThreadLocal对象已经被GC回收了，因为key弱引用
                 if (k == null)
+                    //探测式过期数据回收
                     expungeStaleEntry(i);
                 else
                     i = nextIndex(i, len);
                 e = tab[i];
             }
+            //执行到此，说明关联区段内都没找到相应的数据
             return null;
         }
 
@@ -494,11 +513,14 @@ public class ThreadLocal<T> {
                 }
 
                 if (k == null) {
+                    //k==null成立说明entry#key为空，说明当前entry是过期数据
+                    //替换当前slot
                     replaceStaleEntry(key, value, i);
                     return;
                 }
             }
 
+            //执行到此，说明当前位置的slot为空，无需替换，直接做赋值操作
             tab[i] = new Entry(key, value);
             int sz = ++size;
             if (!cleanSomeSlots(i, sz) && sz >= threshold)
@@ -516,7 +538,9 @@ public class ThreadLocal<T> {
                  e != null;
                  e = tab[i = nextIndex(i, len)]) {
                 if (e.get() == key) {
+                    //清空数据，设为过期entry
                     e.clear();
+                    //清理过期entry
                     expungeStaleEntry(i);
                     return;
                 }
@@ -538,6 +562,8 @@ public class ThreadLocal<T> {
          * @param  staleSlot index of the first stale entry encountered while
          *         searching for key.
          */
+
+        //清理过期entry
         private void replaceStaleEntry(ThreadLocal<?> key, Object value,
                                        int staleSlot) {
             Entry[] tab = table;
@@ -549,14 +575,17 @@ public class ThreadLocal<T> {
             // incremental rehashing due to garbage collector freeing
             // up refs in bunches (i.e., whenever the collector runs).
             int slotToExpunge = staleSlot;
+            //以当前staleSlot位置开始向前迭代寻找，找没有过期的数据，for循环直到碰到null结束
             for (int i = prevIndex(staleSlot, len);
                  (e = tab[i]) != null;
                  i = prevIndex(i, len))
                 if (e.get() == null)
+                    //条件成立表明向前找到了过期数据，更新清理过期数据的开始下标为i
                     slotToExpunge = i;
 
             // Find either the key or trailing null slot of run, whichever
             // occurs first
+            //以当前staleSlot位置开始向后寻找，找没有过期的数据，for循环直到碰到null结束
             for (int i = nextIndex(staleSlot, len);
                  (e = tab[i]) != null;
                  i = nextIndex(i, len)) {
@@ -568,6 +597,7 @@ public class ThreadLocal<T> {
                 // encountered above it, can then be sent to expungeStaleEntry
                 // to remove or rehash all of the other entries in run.
                 if (k == key) {
+                    //条件成立说明是替换逻辑
                     e.value = value;
 
                     tab[i] = tab[staleSlot];
@@ -623,19 +653,26 @@ public class ThreadLocal<T> {
                  (e = tab[i]) != null;
                  i = nextIndex(i, len)) {
                 ThreadLocal<?> k = e.get();
+                //k == null 条件成立:说明k表示的threadLocal对象已经被GC回收了。。。当前entry属于过期脏数据了
                 if (k == null) {
                     e.value = null;
                     tab[i] = null;
                     size--;
                 } else {
+                    //执行到此，说明当前entry不是过期数据
+                    //前面可能清理掉了一些过期数据，可能腾出了一些位置
+                    //若当前entry threadLocal计算出来的路由如果和实际所在的slot不一致，说明之前发生过路由冲突，则进行优化，找到一个和路由位置最接近的位置
                     int h = k.threadLocalHashCode & (len - 1);
                     if (h != i) {
+                        //将当前entry设置为null
                         tab[i] = null;
 
                         // Unlike Knuth 6.4 Algorithm R, we must scan until
                         // null because multiple entries could have been stale.
+                        //从正确的路由h的位置向后查找第一个可以存放的位置
                         while (tab[h] != null)
                             h = nextIndex(h, len);
+                        //设置位置，有可能是正确位置，也有可能是最接近的位置
                         tab[h] = e;
                     }
                 }
@@ -689,10 +726,12 @@ public class ThreadLocal<T> {
          * shrink the size of the table, double the table size.
          */
         private void rehash() {
+            //执行完这个方法，散列表中所有的过期数据都会被清理掉
             expungeStaleEntries();
 
             // Use lower threshold for doubling to avoid hysteresis
             if (size >= threshold - threshold / 4)
+                //清理完之后若size大于等于额 threshold - threshold / 4 将进行扩容
                 resize();
         }
 
@@ -702,17 +741,22 @@ public class ThreadLocal<T> {
         private void resize() {
             Entry[] oldTab = table;
             int oldLen = oldTab.length;
+            //计算出新的散列表长度
             int newLen = oldLen * 2;
             Entry[] newTab = new Entry[newLen];
+            //新table中entry的数量
             int count = 0;
 
             for (int j = 0; j < oldLen; ++j) {
                 Entry e = oldTab[j];
                 if (e != null) {
+                    //获取entry#key
                     ThreadLocal<?> k = e.get();
                     if (k == null) {
+                        //当前条件成立表示当前位置的entry是一个过期数据
                         e.value = null; // Help the GC
                     } else {
+                        //执行到这里，说明老表的当前位置的元素为非过期数据，是正常数据，需要迁移到扩容后的新散列表
                         int h = k.threadLocalHashCode & (newLen - 1);
                         while (newTab[h] != null)
                             h = nextIndex(h, newLen);
@@ -722,6 +766,7 @@ public class ThreadLocal<T> {
                 }
             }
 
+            //这只新的阈值
             setThreshold(newLen);
             size = count;
             table = newTab;
