@@ -569,6 +569,7 @@ public class ConcurrentHashMap<K,V> extends AbstractMap<K,V>
      * excessive memory contention.  The value should be at least
      * DEFAULT_CAPACITY.
      */
+    //控制线程迁移数量最小步长
     private static final int MIN_TRANSFER_STRIDE = 16;
 
     /**
@@ -581,6 +582,7 @@ public class ConcurrentHashMap<K,V> extends AbstractMap<K,V>
      * The maximum number of threads that can help resize.
      * Must fit in 32 - RESIZE_STAMP_BITS bits.
      */
+    //65535
     private static final int MAX_RESIZERS = (1 << (32 - RESIZE_STAMP_BITS)) - 1;
 
     /**
@@ -591,12 +593,16 @@ public class ConcurrentHashMap<K,V> extends AbstractMap<K,V>
     /*
      * Encodings for Node hash fields. See above for explanation.
      */
+    //当节点的hash值为-1时表示当前节点是FWD节点
     static final int MOVED     = -1; // hash for forwarding nodes
+    //表示当前节点已经树化，并且当前节点为treebin节点
     static final int TREEBIN   = -2; // hash for roots of trees
     static final int RESERVED  = -3; // hash for transient reservations
+    //0111 1111 1111 1111 1111 1111 1111 1111 任何数与0x7fffffff进行按位与运算可以得到正数
     static final int HASH_BITS = 0x7fffffff; // usable bits of normal node hash
 
     /** Number of CPUS, to place bounds on some sizings */
+    //cpu核心数
     static final int NCPU = Runtime.getRuntime().availableProcessors();
 
     /** For serialization compatibility. */
@@ -770,11 +776,13 @@ public class ConcurrentHashMap<K,V> extends AbstractMap<K,V>
      * The array of bins. Lazily initialized upon first insertion.
      * Size is always a power of two. Accessed directly by iterators.
      */
+    //散列表，长度为2的次方
     transient volatile Node<K,V>[] table;
 
     /**
      * The next table to use; non-null only while resizing.
      */
+    //扩容过程中的新table赋值给nextTable,扩容结束后nextTable会设置为null
     private transient volatile Node<K,V>[] nextTable;
 
     /**
@@ -782,6 +790,7 @@ public class ConcurrentHashMap<K,V> extends AbstractMap<K,V>
      * but also as a fallback during table initialization
      * races. Updated via CAS.
      */
+    //longAdder中的baseCount未发生竞争时或者当前longAdder处于加锁状态时，增量累加到baseCount中
     private transient volatile long baseCount;
 
     /**
@@ -792,6 +801,7 @@ public class ConcurrentHashMap<K,V> extends AbstractMap<K,V>
      * creation, or 0 for default. After initialization, holds the
      * next element count value upon which to resize the table.
      */
+    //-1表示当前table正在初始化，或者当前table正在扩容， 高16位表示扩容的标识戳， 低16位表示当前参与并发扩容的线程数量
     private transient volatile int sizeCtl;
 
     /**
@@ -802,11 +812,13 @@ public class ConcurrentHashMap<K,V> extends AbstractMap<K,V>
     /**
      * Spinlock (locked via CAS) used when resizing and/or creating CounterCells.
      */
+    //LongAdder中的cellBusy 表示当前对象无锁状态， 1表示当前LongAdder对象处于加锁状态
     private transient volatile int cellsBusy;
 
     /**
      * Table of counter cells. When non-null, size is a power of 2.
      */
+    //总数 = cells值求和 + baseCount
     private transient volatile CounterCell[] counterCells;
 
     // views
@@ -6300,8 +6312,11 @@ public class ConcurrentHashMap<K,V> extends AbstractMap<K,V>
             Class<?> ak = Node[].class;
             ABASE = U.arrayBaseOffset(ak);
             int scale = U.arrayIndexScale(ak);
+            //用于判断scale是否是2的次方
+            //2的次方按位与 比自己小1的数 得出 0
             if ((scale & (scale - 1)) != 0)
                 throw new Error("data type scale not a power of two");
+            //numberOfLeadingZeros 判断高位开始有几个连续的0
             ASHIFT = 31 - Integer.numberOfLeadingZeros(scale);
         } catch (Exception e) {
             throw new Error(e);

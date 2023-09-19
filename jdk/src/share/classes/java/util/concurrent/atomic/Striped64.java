@@ -220,14 +220,24 @@ abstract class Striped64 extends Number {
                               boolean wasUncontended) {
         int h;
         if ((h = getProbe()) == 0) {
+            //若线程的哈希是默认值0则
+            //给当前线程分配hash值
             ThreadLocalRandom.current(); // force initialization
             h = getProbe();
+            //标记未出现竞争
             wasUncontended = true;
         }
+        //
         boolean collide = false;                // True if last slot nonempty
         for (;;) {
+            //as - cells引用
+            //a - 命中的cell引用
+            //n - 数组长度
+            // v - cas期望值
             Cell[] as; Cell a; int n; long v;
+            //cells未初始化时进入
             if ((as = cells) != null && (n = as.length) > 0) {
+                //命中位置的cell为null，需要创建
                 if ((a = as[(n - 1) & h]) == null) {
                     if (cellsBusy == 0) {       // Try to attach new Cell
                         Cell r = new Cell(x);   // Optimistically create
@@ -276,9 +286,11 @@ abstract class Striped64 extends Number {
                 }
                 h = advanceProbe(h);
             }
+            //cells未初始化过，准备占用锁，来初始化cells
             else if (cellsBusy == 0 && cells == as && casCellsBusy()) {
                 boolean init = false;
                 try {                           // Initialize table
+                    //if防止其他线程先初始化过，导致丢数据
                     if (cells == as) {
                         Cell[] rs = new Cell[2];
                         rs[h & 1] = new Cell(x);
@@ -291,6 +303,7 @@ abstract class Striped64 extends Number {
                 if (init)
                     break;
             }
+            //抢占锁失败，直接改base
             else if (casBase(v = base, ((fn == null) ? v + x :
                                         fn.applyAsLong(v, x))))
                 break;                          // Fall back on using base
