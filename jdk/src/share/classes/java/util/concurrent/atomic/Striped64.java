@@ -126,6 +126,7 @@ abstract class Striped64 extends Number {
 
         // Unsafe mechanics
         private static final sun.misc.Unsafe UNSAFE;
+        //value的内存地址偏移量
         private static final long valueOffset;
         static {
             try {
@@ -151,11 +152,13 @@ abstract class Striped64 extends Number {
      * Base value, used mainly when there is no contention, but also as
      * a fallback during table initialization races. Updated via CAS.
      */
+    //没有发生竞争时，数据会直接累加到base上，当cells需要扩容时，需要将数据写到base中
     transient volatile long base;
 
     /**
      * Spinlock (locked via CAS) used when resizing and/or creating Cells.
      */
+    //0表示无锁 ，1表示其他线程已锁
     transient volatile int cellsBusy;
 
     /**
@@ -174,6 +177,7 @@ abstract class Striped64 extends Number {
     /**
      * CASes the cellsBusy field from 0 to 1 to acquire lock.
      */
+    //通过cas来获取锁
     final boolean casCellsBusy() {
         return UNSAFE.compareAndSwapInt(this, CELLSBUSY, 0, 1);
     }
@@ -191,6 +195,7 @@ abstract class Striped64 extends Number {
      * given thread.
      * Duplicated from ThreadLocalRandom because of packaging restrictions.
      */
+    //充值当前线程的probe
     static final int advanceProbe(int probe) {
         probe ^= probe << 13;   // xorshift
         probe ^= probe >>> 17;

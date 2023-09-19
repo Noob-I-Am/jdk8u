@@ -82,10 +82,22 @@ public class LongAdder extends Striped64 implements Serializable {
      * @param x the value to add
      */
     public void add(long x) {
+        /**
+         * as - cells的引用
+         * b - base的引用
+         * v - cas的期望值
+         * m - cells的长度
+         * a - 命中的cells单元格
+         */
         Cell[] as; long b, v; int m; Cell a;
+        //cells 不为 null表示 cells 为 null表示已初始化过应该写入对应的cells中， cells为 null表示还未初始化应该写入base中
+        //casBase失败表示发生竞争了
         if ((as = cells) != null || !casBase(b = base, b + x)) {
             boolean uncontended = true;
+            //as==null为false表示写base竞争失败了
+            //m == as.length as的长度为2的幂，减1得到所有位为1的数
             if (as == null || (m = as.length - 1) < 0 ||
+                    //getProbe 可以理解为拿到的是当前线程的hash
                 (a = as[getProbe() & m]) == null ||
                 !(uncontended = a.cas(v = a.value, v + x)))
                 longAccumulate(x, null, uncontended);
