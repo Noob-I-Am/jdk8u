@@ -627,41 +627,55 @@ public class HashMap<K,V> extends AbstractMap<K,V>
                    boolean evict) {
         Node<K,V>[] tab; Node<K,V> p; int n, i;
         if ((tab = table) == null || (n = tab.length) == 0)
+             //情况1: tab为空或者桶位数量为0， 则进行resize
             n = (tab = resize()).length;
         if ((p = tab[i = (n - 1) & hash]) == null)
+            //情况2: hash值对应的桶位为空, 则将新值插入其中
             tab[i] = newNode(hash, key, value, null);
         else {
+            //桶位已有值，产生冲突的情况
             Node<K,V> e; K k;
             if (p.hash == hash &&
                 ((k = p.key) == key || (key != null && key.equals(k))))
+                //key的 hash 并且 equals相等 ， 则更新新值
                 e = p;
             else if (p instanceof TreeNode)
+                //当前桶位如果是树，则添加树节点
                 e = ((TreeNode<K,V>)p).putTreeVal(this, tab, hash, key, value);
             else {
+                //当前桶位已形成链表， 从链表头p开始遍历
                 for (int binCount = 0; ; ++binCount) {
                     if ((e = p.next) == null) {
+                        //当遍历到链表末尾时，把新节点插入
                         p.next = newNode(hash, key, value, null);
+                        //TREEIFY_THRESHOLD 为 8， 说明冲突节点达到 6 以上就开始树化
                         if (binCount >= TREEIFY_THRESHOLD - 1) // -1 for 1st
                             treeifyBin(tab, hash);
                         break;
                     }
                     if (e.hash == hash &&
                         ((k = e.key) == key || (key != null && key.equals(k))))
+                        //跳出循环时表示key已有
                         break;
                     p = e;
                 }
             }
+            //e为链表中已有节点，表示当前Put的key已经存在
             if (e != null) { // existing mapping for key
                 V oldValue = e.value;
                 if (!onlyIfAbsent || oldValue == null)
+                    //更新value
                     e.value = value;
                 afterNodeAccess(e);
                 return oldValue;
             }
         }
+        //飞
         ++modCount;
         if (++size > threshold)
+            //实际大小大于阈值，则扩容
             resize();
+        //插值后空处理
         afterNodeInsertion(evict);
         return null;
     }
@@ -677,7 +691,9 @@ public class HashMap<K,V> extends AbstractMap<K,V>
      */
     final Node<K,V>[] resize() {
         Node<K,V>[] oldTab = table;
+        //旧的tab容量
         int oldCap = (oldTab == null) ? 0 : oldTab.length;
+        //旧阈值
         int oldThr = threshold;
         int newCap, newThr = 0;
         if (oldCap > 0) {
@@ -705,11 +721,14 @@ public class HashMap<K,V> extends AbstractMap<K,V>
         Node<K,V>[] newTab = (Node<K,V>[])new Node[newCap];
         table = newTab;
         if (oldTab != null) {
+            //遍历旧tab每一个桶位
             for (int j = 0; j < oldCap; ++j) {
                 Node<K,V> e;
                 if ((e = oldTab[j]) != null) {
+                    //旧引用取消
                     oldTab[j] = null;
                     if (e.next == null)
+                        //如果桶位只有一个节点，计算新桶位置，并放入e
                         newTab[e.hash & (newCap - 1)] = e;
                     else if (e instanceof TreeNode)
                         ((TreeNode<K,V>)e).split(this, newTab, j, oldCap);
@@ -718,7 +737,10 @@ public class HashMap<K,V> extends AbstractMap<K,V>
                         Node<K,V> hiHead = null, hiTail = null;
                         Node<K,V> next;
                         do {
+                            //e为桶位头节点
                             next = e.next;
+                            //e.hash & oldCap 用来判断新的桶位置是在高位还是低位置
+                            //低位置
                             if ((e.hash & oldCap) == 0) {
                                 if (loTail == null)
                                     loHead = e;
@@ -727,6 +749,7 @@ public class HashMap<K,V> extends AbstractMap<K,V>
                                 loTail = e;
                             }
                             else {
+                                //高位置
                                 if (hiTail == null)
                                     hiHead = e;
                                 else

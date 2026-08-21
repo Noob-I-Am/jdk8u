@@ -208,15 +208,20 @@ public class DelayQueue<E extends Delayed> extends AbstractQueue<E>
             for (;;) {
                 E first = q.peek();
                 if (first == null)
+                    //队列为空，则等待
                     available.await();
                 else {
+                    //获取队头剩余延迟时间
                     long delay = first.getDelay(NANOSECONDS);
                     if (delay <= 0)
+                        //小于等于0，直接返回队头
                         return q.poll();
                     first = null; // don't retain ref while waiting
                     if (leader != null)
+                        //leader不为空
                         available.await();
                     else {
+                        //leader为空
                         Thread thisThread = Thread.currentThread();
                         leader = thisThread;
                         try {

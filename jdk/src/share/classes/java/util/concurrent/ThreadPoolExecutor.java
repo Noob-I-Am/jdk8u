@@ -378,13 +378,19 @@ public class ThreadPoolExecutor extends AbstractExecutorService {
      * that workerCount is 0 (which sometimes entails a recheck -- see
      * below).
      */
+    //线程池中的原子整型ctl,高3位作为状态位，低29位作为线程计数
     private final AtomicInteger ctl = new AtomicInteger(ctlOf(RUNNING, 0));
     private static final int COUNT_BITS = Integer.SIZE - 3;
     private static final int CAPACITY   = (1 << COUNT_BITS) - 1;
 
     // runState is stored in the high-order bits
+    //计算结果为负数
     private static final int RUNNING    = -1 << COUNT_BITS;
+
+    //计算结果为0
     private static final int SHUTDOWN   =  0 << COUNT_BITS;
+
+    //以下三个状态计算结果都为正数
     private static final int STOP       =  1 << COUNT_BITS;
     private static final int TIDYING    =  2 << COUNT_BITS;
     private static final int TERMINATED =  3 << COUNT_BITS;
@@ -614,7 +620,9 @@ public class ThreadPoolExecutor extends AbstractExecutorService {
          * @param firstTask the first task (null if none)
          */
         Worker(Runnable firstTask) {
-            setState(-1); // inhibit interrupts until runWorker //防止work执行任务之前被其他线程调用shutdown中断，interruptIfStarted方法中会判断state
+            //防止worker执行任务runWorker之前被其他线程调用shutdown中断，
+            // interruptIfStarted方法中会判断state, 只有state >= 0的时候才能被中断
+            setState(-1); // inhibit interrupts until runWorker
             this.firstTask = firstTask;
             this.thread = getThreadFactory().newThread(this);
         }
@@ -969,6 +977,7 @@ public class ThreadPoolExecutor extends AbstractExecutorService {
                     // shut down before lock acquired.
                     int rs = runStateOf(ctl.get());
 
+                    //rs < SHUTDOWN 表示正在运行
                     if (rs < SHUTDOWN ||
                         (rs == SHUTDOWN && firstTask == null)) {
                         if (t.isAlive()) // precheck that t is startable
@@ -984,6 +993,7 @@ public class ThreadPoolExecutor extends AbstractExecutorService {
                     mainLock.unlock();
                 }
                 if (workerAdded) {
+                    //t.start() 则开始运行线程任务，最终会调用worker中的runWorker方法
                     t.start();
                     workerStarted = true;
                 }
@@ -1184,11 +1194,12 @@ public class ThreadPoolExecutor extends AbstractExecutorService {
         Thread wt = Thread.currentThread();
         Runnable task = w.firstTask;
         w.firstTask = null;
-        w.unlock(); // allow interrupts 内部实现设置state=0 允许响应中断
+        //内部实现设置state=0 允许响应中断
+        w.unlock(); // allow interrupts
         //是否突然退出
         boolean completedAbruptly = true;
         try {
-            //getTask为阻塞方法
+            //getTask为阻塞方法, getTask()阻塞事件如果超过keepAliveTime，则停止阻塞直接返回null，导致此worker被回收
             while (task != null || (task = getTask()) != null) {
                 //shutdown的时候会通过独占锁检查worker是否正在工作
                 w.lock();
@@ -1201,8 +1212,9 @@ public class ThreadPoolExecutor extends AbstractExecutorService {
                 if ((runStateAtLeast(ctl.get(), STOP) ||
                      (Thread.interrupted() &&
                       runStateAtLeast(ctl.get(), STOP))) &&
-                    !wt.isInterrupted())
+                    !wt.isInterrupted()){
                     wt.interrupt();
+                }
                 try {
                     beforeExecute(wt, task);
                     Throwable thrown = null;
@@ -1492,7 +1504,7 @@ public class ThreadPoolExecutor extends AbstractExecutorService {
         try {
             checkShutdownAccess();
             advanceRunState(SHUTDOWN); //设置当前线程池状态，确保至少是shutdown
-            interruptIdleWorkers(); //中断空闲线程
+            interruptIdleWorkers(); //中断空闲线程,只处理空闲线程
             onShutdown(); // hook for ScheduledThreadPoolExecutor  //钩子函数，空实现，待扩展
         } finally {
             //释放线程池全局锁
@@ -1525,7 +1537,7 @@ public class ThreadPoolExecutor extends AbstractExecutorService {
         try {
             checkShutdownAccess();
             advanceRunState(STOP);
-            interruptWorkers();
+            interruptWorkers(); //中断所有worker线程
             tasks = drainQueue(); //返回未处理的任务
         } finally {
             mainLock.unlock();

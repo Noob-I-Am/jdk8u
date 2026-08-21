@@ -130,13 +130,17 @@ public class ReentrantLock implements Lock, java.io.Serializable {
             final Thread current = Thread.currentThread();
             int c = getState();
             if (c == 0) {
-                //与公平锁的区别为没有判断hasQueuedPredecessors
+                //与公平锁的区别为没有调用hasQueuedPredecessors判断前置节点
+                //公平锁按照先来后到的顺序抢占
+                //非公平锁直接抢占
                 if (compareAndSetState(0, acquires)) {
                     setExclusiveOwnerThread(current);
                     return true;
                 }
             }
+            //当前线程为持锁线程，则为重入
             else if (current == getExclusiveOwnerThread()) {
+                //更新state
                 int nextc = c + acquires;
                 if (nextc < 0) // overflow
                     throw new Error("Maximum lock count exceeded");
@@ -248,7 +252,7 @@ public class ReentrantLock implements Lock, java.io.Serializable {
                     return true;
                 }
             }
-            /**
+            /*
              * 到此表示锁已被占用
              * current == getExclusiveOwnerThread()
              * 判断当前线程是否是锁占有者(重入), 进入if则表示锁重入
